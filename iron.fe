@@ -1,0 +1,101 @@
+#! /usr/bin/env ferite
+
+uses "console", "network", "regexp", "sys", "posix", "reflection", "regexp";
+
+class HttpRequestHandler {
+	function callback (object<HttpServerRequest> req) {}
+}
+
+class HttpServerRequest {
+	string request;
+	string buffer;
+	array headers;
+	object socket;
+	object<HttpRequestHandler> handler;
+	
+	function handleSocket () {
+		while (!Regexp.match("\n\\s*\n",self.buffer)) {
+			string txt = self.socket.readln();
+			Console.println('>>>' + txt + '<<<');
+			self.buffer += txt;
+		}
+		{
+			array lines = Regexp.split("\r*\n",self.buffer);
+			
+			self.request = lines[0];
+			
+			lines[1..].each() using (h) {
+				if (h != '') {
+					array header_fragments = Regexp.split('\s*:\s*',h);
+					if (header_fragments.size() > 1) {
+						self.headers[header_fragments[0]] = header_fragments[1..].join(':');
+				
+						Console.println('Header: ' + header_fragments[0] + ' -> ' + self.headers[header_fragments[0]]);
+					}
+				}
+			};
+			
+			self.handler.callback(self);
+		}
+	}
+}
+
+class MyServer extends HttpRequestHandler {
+	function callback (object<HttpServerRequest> req) {
+		array res = [
+			'HTTP/1.0 200 OK',
+			'Content-Type: text/html',
+			'Content-Length: 56',
+			'',
+			'<html><body><h1>OK</h1>seems to be working</body></html>'
+		];
+
+		Console.println(req.request);
+		Console.println(req.headers.join("\n"));
+		req.socket.print(res.join("\n"));
+		
+		descriptors.del(descriptors.find(req.socket));
+		requests.del('' + req.socket.getDescriptor());
+		
+		req.socket.close();
+	}
+}
+
+global {
+	object sock;
+	array descriptors;
+	array requests;
+}
+
+sock = Network.TCP.bind(Network.ANY,9090);
+
+if (sock != null) {
+	object<MyServer> my_server = new MyServer(); 
+	descriptors = [ sock ];
+
+	while (1) {
+		object select_result = Posix.select(descriptors,[],[],1);
+		
+		if (select_result != null && select_result.read.size() > 0) {
+			select_result.read.each() using(con) {
+				if (con == sock) {
+					object client_connection = con.accept();
+					string key = '' + client_connection.getDescriptor();
+					object httpservice = new HttpServerRequest();
+					httpservice.socket = client_connection;
+					httpservice.handler = my_server;
+					
+					descriptors.push(client_connection);
+					requests[key] = httpservice;
+				}
+				else {
+					string key = '' + con.getDescriptor();
+					
+					if (requests[key]) {
+						requests[key].handleSocket();
+					}
+				}
+			};
+		}
+	}
+}
