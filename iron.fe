@@ -14,12 +14,11 @@ class HttpServerRequest {
 	object<HttpRequestHandler> handler;
 	
 	function handleSocket () {
-		while (!Regexp.match("\n\\s*\n",self.buffer)) {
+		while (!self.socket.eos()) {
 			string txt = self.socket.readln();
-			Console.println('>>>' + txt + '<<<');
 			self.buffer += txt;
 		}
-		{
+		if (Regexp.match("\n\\s*\n",self.buffer)) {
 			array lines = Regexp.split("\r*\n",self.buffer);
 			
 			self.request = lines[0];
@@ -29,8 +28,6 @@ class HttpServerRequest {
 					array header_fragments = Regexp.split('\s*:\s*',h);
 					if (header_fragments.size() > 1) {
 						self.headers[header_fragments[0]] = header_fragments[1..].join(':');
-				
-						Console.println('Header: ' + header_fragments[0] + ' -> ' + self.headers[header_fragments[0]]);
 					}
 				}
 			};
@@ -41,7 +38,7 @@ class HttpServerRequest {
 }
 
 class MyServer extends HttpRequestHandler {
-	function callback (object<HttpServerRequest> req) {
+	function callback (object req) {
 		array res = [
 			'HTTP/1.0 200 OK',
 			'Content-Type: text/html',
@@ -51,14 +48,58 @@ class MyServer extends HttpRequestHandler {
 		];
 
 		Console.println(req.request);
-		Console.println(req.headers.join("\n"));
+		req.headers.keys().each() using(key) {
+			Console.println(key + ' -> ' + req.headers[key]);
+		};
+		
 		req.socket.print(res.join("\n"));
+		req.socket.flush();
 		
 		descriptors.del(descriptors.find(req.socket));
-		requests.del('' + req.socket.getDescriptor());
+		requests.del(getKey(req.socket));
 		
 		req.socket.close();
+		// Console.println('END OF CALLBACK ############################');
 	}
+}
+
+function getKey (object con) {
+	return '' + con.getDescriptor();
+}
+
+function addHttpListener (object con, object listener) {
+	object httpservice = new HttpServerRequest();
+	
+	con.nonblock();
+	httpservice.socket = con;
+	httpservice.handler = listener;
+	requests[getKey(con)] = httpservice;
+}
+
+function addSelectDescriptor (object con) {
+	descriptors.push(con);
+}
+
+function acceptConnection (object con,object listener) {
+	object client_connection = con.accept();
+	string key = getKey(client_connection);
+	addHttpListener(client_connection,listener);
+	addSelectDescriptor(client_connection);
+}
+
+function keyCheck (array a, string k) {
+	Console.println('KEY---> ' + k);
+	Console.println('ARRAY:');
+	Console.println(a.join("\n"));
+	return a[k];
+}
+
+function handleIncomingData (object con) {
+	string key = getKey(con);
+	if (keyCheck(requests,key)) {
+		requests[key].handleSocket();
+	}
+	Console.println('end of handleIncomingData');
 }
 
 global {
@@ -79,21 +120,10 @@ if (sock != null) {
 		if (select_result != null && select_result.read.size() > 0) {
 			select_result.read.each() using(con) {
 				if (con == sock) {
-					object client_connection = con.accept();
-					string key = '' + client_connection.getDescriptor();
-					object httpservice = new HttpServerRequest();
-					httpservice.socket = client_connection;
-					httpservice.handler = my_server;
-					
-					descriptors.push(client_connection);
-					requests[key] = httpservice;
+					acceptConnection(con,my_server);
 				}
 				else {
-					string key = '' + con.getDescriptor();
-					
-					if (requests[key]) {
-						requests[key].handleSocket();
-					}
+					handleIncomingData(con);
 				}
 			};
 		}
