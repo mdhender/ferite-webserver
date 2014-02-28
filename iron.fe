@@ -7,53 +7,216 @@ class HttpRequestHandler {
 }
 
 class HttpServerRequest {
-	string request;
+	array request;
 	string buffer;
 	array headers;
 	object socket;
 	object<HttpRequestHandler> handler;
 	
-	function handleSocket () {
+	function fillBuffer () {
 		while (!self.socket.eos()) {
-			string txt = self.socket.readln();
+			string txt = self.socket.read(65536);
 			self.buffer += txt;
 		}
-		if (Regexp.match("\n\\s*\n",self.buffer)) {
-			array lines = Regexp.split("\r*\n",self.buffer);
+	}
+	
+	function parseHeaders (array lines) {
+		array headers;
+		
+		lines.each() using (h) {
+			if (h != '') {
+				array header_fragments = Regexp.split('\s*:\s*',h);
+				if (header_fragments.size() > 1) {
+					headers[header_fragments[0]] = header_fragments[1..].join(':');
+				}
+			}
+		};
+		
+		return headers;
+	}
+	
+	function parseRequestCommand (string request_text) {
+		array r = Regexp.split('\s+',request_text);
+		if (r.size() == 3) {
+			array c = [
+				'text' => request_text,
+				'command' => r[0],
+				'fullpath' => r[1],
+				'proto' => r[2]
+			];
+			array q = Regexp.split('\?',c.fullpath);
+			c['path'] = q[0];
+			if (q.size() > 1) {
+				c['query'] = q[1];
+			}
+			else {
+				c['query'] = '';
+			}
+		}
+		else {
+			Console.println("Something went wrong! ${request_text}");
+		}
+		return c;
+	}
+	
+	function parseHttp () {
+		if (!self.request) {
+			object m = Regexp.match("\n\\s*\n",self.buffer);
+			if (m) {
+				string header_text = self.buffer[.. m.start()-1];
+				array lines = Regexp.split("\r*\n",header_text);
+				self.buffer = self.buffer[m.end()-1 ..];
 			
-			self.request = lines[0];
+				self.request = self.parseRequestCommand(lines[0]);
+				self.headers = self.parseHeaders(lines[1..]);
 			
-			lines[1..].each() using (h) {
-				if (h != '') {
-					array header_fragments = Regexp.split('\s*:\s*',h);
-					if (header_fragments.size() > 1) {
-						self.headers[header_fragments[0]] = header_fragments[1..].join(':');
+				self.handler.callback(self);
+			}
+		}
+	}
+	
+	function handleSocket () {
+		self.fillBuffer();
+		self.parseHttp();
+	}
+}
+
+function page_counter (object req) {
+	string html = "<html><body><h1>OK</h1>Count = ${counter}</body></html>";
+	array res = [
+		'HTTP/1.0 200 OK',
+		'Content-Type: text/html',
+		'Content-Length: ' + html.length(),
+		'',
+		html
+	];
+	
+	// Console.println("count = ${counter}");
+	counter ++;
+	
+	req.socket.print(res.join("\n"));
+	req.socket.flush();
+}
+
+function page_stress (object req) {
+	number clients = 200;
+	number poll_rate = 1;
+	if (req.request.query != '') {
+		array params = Regexp.split('&',req.request.query);
+		if (params.size() > 0) {
+			params.each() using(p) {
+				array r = Regexp.split('=',p);
+				if (r.size() == 2) {
+					switch (r[0]) {
+						case 'clients':
+							clients = r[1].toNumber();
+							break;
+						case 'rate':
+							poll_rate = r[1].toNumber();
+							break;
 					}
 				}
 			};
-			
-			self.handler.callback(self);
 		}
 	}
+	{
+		string html =
+			"<html><body><h1>Stress Test</h1>" +
+				"Simulating " + clients + " clients " +
+				"each attempting to poll every " + poll_rate + " second." +
+				"<div>" +
+					"Request per second: <span id='rate'></span> " +
+					"(long average: <span id='avg'></span>)" +
+				"</div>" +
+				"<div id='c'></div>" +
+				"<script src='http://code.jquery.com/jquery-2.1.0.min.js'></script>" +
+				"<script>" +
+				"var requests = 0;" +
+				"var total_requests = 0;" +
+				"function ajax_loop (id) {" +
+					"var then = new Date();" +
+					"$.ajax({" +
+						"type: 'get'," +
+						"url: '/counter'," +
+						"cache: false," +
+						"dataType: 'text'," +
+						"success: function (result) {" +
+							"var now = new Date();" +
+							"requests++;total_requests++;" +
+							"$('#'+id).html(" +
+								"result.match(/Count\\s*=\\s*\\d+/) + ' (' + " +
+								"(now-then) + 'ms)');" +
+							"setTimeout(function(){ajax_loop(id)}," + (poll_rate*1000) + ");" +
+						"}" +
+					"});" +
+				"};" +
+				"var lap = new Date();" +
+				"var total_lap = new Date();" +
+				"setInterval(function(){" +
+					"var now = new Date();" +
+					"var rate = requests/((now-lap)/1000);" +
+					"var avg = total_requests/((now-total_lap)/1000);" +
+					"lap = now;" +
+					"$('#rate').html(rate.toFixed(2));" +
+					"$('#avg').html(avg.toFixed(2));" +
+					"requests = 0;" +
+				"},1000);" +
+				"function make_counters (n) {" +
+					"while (n) {" +
+						"$('#c').append('<div id=\\'c' + n + '\\'></div>');" +
+						"ajax_loop('c'+n);" +
+						"n--;" +
+					"}" +
+				"}" +
+				"make_counters(" + clients + ");" +
+				"</script>" +
+			"</body></html>";
+		array res = [
+			'HTTP/1.0 200 OK',
+			'Content-Type: text/html',
+			'Content-Length: ' + html.length(),
+			'',
+			html
+		];
+		
+		req.socket.print(res.join("\n"));
+		req.socket.flush();
+	}
+}
+
+function page_404 (object req) {
+	string html = "<html><body><h1>ERROR 404</h1>Sorry, file not found.</body></html>";
+	array res = [
+		'HTTP/1.0 404 Not Found',
+		'Content-Type: text/html',
+		'Content-Length: ' + html.length(),
+		'',
+		html
+	];
+	
+	req.socket.print(res.join("\n"));
+	req.socket.flush();
 }
 
 class MyServer extends HttpRequestHandler {
 	function callback (object req) {
-		array res = [
-			'HTTP/1.0 200 OK',
-			'Content-Type: text/html',
-			'Content-Length: 56',
-			'',
-			'<html><body><h1>OK</h1>seems to be working</body></html>'
-		];
-
-		Console.println(req.request);
+		switch (req.request.path) {
+ 			case '/counter':
+ 				page_counter(req);
+ 				break;
+ 			case '/stress':
+ 				page_stress(req);
+ 				break;
+ 			default:
+ 				page_404(req);
+ 		}
+		
+		/*
+		Console.println(req.request.text);
 		req.headers.keys().each() using(key) {
 			Console.println(key + ' -> ' + req.headers[key]);
 		};
-		
-		req.socket.print(res.join("\n"));
-		req.socket.flush();
+		*/
 		
 		descriptors.del(descriptors.find(req.socket));
 		requests.del(getKey(req.socket));
@@ -83,14 +246,19 @@ function addSelectDescriptor (object con) {
 function acceptConnection (object con,object listener) {
 	object client_connection = con.accept();
 	string key = getKey(client_connection);
+	
+	// Console.println("Accepting connection on ${key}");
+	
 	addHttpListener(client_connection,listener);
 	addSelectDescriptor(client_connection);
 }
 
 function keyCheck (array a, string k) {
+	/*
 	Console.println('KEY---> ' + k);
 	Console.println('ARRAY:');
 	Console.println(a.join("\n"));
+	*/
 	return a[k];
 }
 
@@ -99,16 +267,19 @@ function handleIncomingData (object con) {
 	if (keyCheck(requests,key)) {
 		requests[key].handleSocket();
 	}
-	Console.println('end of handleIncomingData');
+	
+	// Console.println('end of handleIncomingData');
 }
 
 global {
 	object sock;
 	array descriptors;
 	array requests;
+	number counter;
 }
 
 sock = Network.TCP.bind(Network.ANY,9090);
+counter = 0;
 
 if (sock != null) {
 	object<MyServer> my_server = new MyServer(); 
