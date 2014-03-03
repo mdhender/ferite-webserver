@@ -1,4 +1,4 @@
-uses "network", "posix", "sys";
+uses 'network', 'posix', 'sys';
 
 class TcpServerRequest {
 	string buffer;
@@ -85,26 +85,28 @@ class TcpServer {
 	}
 	
 	function handleSelect (object select_result) {
-		if (self.handler && select_result != null && select_result.read.size() > 0) {
-			select_result.read.each() using(con) {
-				if (con == self.sock) {
-					self.acceptConnection(self,con,self.handler);
-				}
-				else {
-					string key = self.getKey(con);
-					if (self.requests[key]) {
-						object tcp_request = self.requests[key];
-						tcp_request.handleSocket();
-						
-						// Cleanup broken connections:
-						if (tcp_request.socket) {
-							if (tcp_request.socket.eos()) {
-								tcp_request.close();
+		if (self.handler && select_result != null) {
+			if (select_result.read.size() > 0) {
+				select_result.read.each() using(con) {
+					if (con == self.sock) {
+						self.acceptConnection(self,con,self.handler);
+					}
+					else {
+						string key = self.getKey(con);
+						if (self.requests[key]) {
+							object tcp_request = self.requests[key];
+							tcp_request.handleSocket();
+							
+							// Cleanup broken connections:
+							if (tcp_request.socket) {
+								if (tcp_request.socket.eos()) {
+									tcp_request.close();
+								}
 							}
 						}
 					}
-				}
-			};
+				};
+			}
 		}
 	}
 

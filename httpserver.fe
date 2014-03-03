@@ -1,23 +1,42 @@
-uses "regexp", "sys", "./tcpserver";
+uses 'regexp', 'sys', 'date', './tcpserver';
 
 class HttpServerRequest extends TcpServerRequest {
 	array request;
 	array headers;
 	array query;
+	private string httpDateFormat = '%a, %d %b %Y %H:%M:%S %z GMT';
+	private object content_handler;
 	
 	function parseHeaders (array lines) {
 		array headers;
+		// Note: Header names are converted to lower case for consistency
 		
 		lines.each() using (h) {
 			if (h != '') {
 				array header_fragments = Regexp.split('\s*:\s*',h);
 				if (header_fragments.size() > 1) {
-					headers[header_fragments[0]] = header_fragments[1..].join(':');
+					string key = header_fragments[0];
+					string lowercase_key = key.toLower();
+					string underscore_key = Regexp.replace('-',lowercase_key,'_');
+					string value_text = header_fragments[1..].join(':');
+					void value;
+					
+					// Automatic conversion for numerical values:
+					if (value_text.isNumber()) value = value_text.toNumber();
+					else                       value = value_text;
+					
+					headers[key] = value;
+					headers[lowercase_key] = value;
+					headers[underscore_key] = value;
 				}
 			}
 		};
 		
 		return headers;
+	}
+	
+	function timestamp () {
+		return Date.date(Date.GMTnow()).format(self.httpDateFormat);
 	}
 
 	function parseRequestCommand (string request_text) {
@@ -25,7 +44,7 @@ class HttpServerRequest extends TcpServerRequest {
 		if (r.size() == 3) {
 			array c = [
 				'text' => request_text,
-				'command' => r[0],
+				'method' => r[0],
 				'fullpath' => r[1],
 				'proto' => r[2]
 			];
@@ -60,13 +79,63 @@ class HttpServerRequest extends TcpServerRequest {
 		return q;
 	}
 	
+	private function cleanup () {
+		self.headers = [];
+		self.request = [];
+		self.query = [];
+	}
+	
+	private function processContentLength () {
+		number buffer_length = self.buffer.length();
+		number content_length = self.headers.content_length;
+		
+		if (buffer_length >= content_length) {
+			string content;
+			
+			if (buffer_length > content_length) {
+				content = self.buffer[.. content_length];
+				self.buffer = self.buffer[content_length+1 ..];
+			}
+			else {
+				content = self.buffer;
+				self.buffer = '';
+			}
+			self.content_handler.invoke(self,content);
+			self.cleanup();
+		}
+	}
+	
+	private function processChunked () {
+	
+	}
+	
+	private function processPOST () {
+		if (self.content_handler) {
+			array h = self.headers;
+			
+			if (h['content_length'] != null) {
+				if (h.content_length > 0)
+					self.processContentLength();
+			}
+			else if (h['transfer_encoding'] != null) {
+				if (h.transfer_encoding == 'chunked')
+					self.processChunked();
+			}
+		}
+	}
+	
 	private function parseHttp () {
 		if (!self.request) {
 			object m = Regexp.match("\n\\s*\n",self.buffer);
 			if (m) {
 				string header_text = self.buffer[.. m.start()-1];
 				array lines = Regexp.split("\r*\n",header_text);
-				self.buffer = self.buffer[m.end()-1 ..];
+				if (m.end() < self.buffer.length()) {
+					self.buffer = self.buffer[m.end() ..];
+				}
+				else {
+					self.buffer = '';
+				}
 			
 				self.request = self.parseRequestCommand(lines[0]);
 				self.query = self.parseQueryString(self.request.query_string);
@@ -75,6 +144,31 @@ class HttpServerRequest extends TcpServerRequest {
 				self.handler.invoke(self);
 			}
 		}
+		
+		// Not using else because we may need to process
+		// this after invoking the handler callback.
+		
+		if (self.request) {
+			if (self.request.method == 'POST') {
+				self.processPOST();
+			}
+			else {
+				// Only POST has content so cleanup request if not POST:
+				self.cleanup();
+			}
+		}
+	}
+	
+	function getContent () {
+		object handler = recipient();
+		if (handler) {
+			self.content_handler = handler;
+		}
+	}
+	
+	function hasContent () {
+		if (self.content_handler) return true;
+		else                      return false;
 	}
 	
 	function query (string key) {
