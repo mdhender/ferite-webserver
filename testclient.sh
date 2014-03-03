@@ -1,7 +1,7 @@
 #! /bin/bash
 
 httpRequest() {
-	wget -T 10 http://localhost:9090/counter -O - 2> /dev/null |
+	wget -T 2 http://localhost:9090/counter -O - 2> /dev/null |
 	grep -E 'Count = [0-9]+'
 }
 

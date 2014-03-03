@@ -63,29 +63,38 @@ if [ "$NUMBER_OF_CLIENTS" != "" ];then
 			REQUESTS=$[ `cat .stats.raw|wc -l` - 1 ]
 			INTERVAL_SUM=`sum .stats.raw`
 			echo > .stats.raw
-			if (( $REQUESTS > 0 ));then
-				ERRORS=$[ `cat .stats.error|wc -l` - 1 ]
-				TOTAL_REQUESTS=$[ $TOTAL_REQUESTS + $REQUESTS ]
-				INTERVAL_AVERAGE=$[ $INTERVAL_SUM / $REQUESTS ]
-		
-				RATE=$[ ( $REQUESTS * 1000 ) / ( $NOW - $THEN ) ]
-				AVERAGE=$[ ( $TOTAL_REQUESTS * 1000 ) / ( $NOW - $START_TIME ) ]
 			
-				REPORT="Request per second: $RATE (average: $AVERAGE)."
-				REPORT="$REPORT Average time: $INTERVAL_AVERAGE ms."
-				if (( $ERRORS > 1 ));then
-					REPORT="$REPORT $ERRORS errors"
-				elif (( $ERRORS > 0 ));then
-					REPORT="$REPORT $ERRORS error"
-				fi
-				echo $REPORT > stats.txt
-				THEN=$NOW
+			ERRORS=$[ `cat .stats.error|wc -l` - 1 ]
+			TOTAL_REQUESTS=$[ $TOTAL_REQUESTS + $REQUESTS ]
+			
+			if (( $REQUESTS > 0 ));then
+				INTERVAL_AVERAGE="$[ $INTERVAL_SUM / $REQUESTS ] ms"
+			else
+				INTERVAL_AVERAGE='n/a'
 			fi
+		
+			RATE=$[ ( $REQUESTS * 1000 ) / ( $NOW - $THEN ) ]
+			AVERAGE=$[ ( $TOTAL_REQUESTS * 1000 ) / ( $NOW - $START_TIME ) ]
+			
+			REPORT="Request per second: $RATE (average: $AVERAGE).\n"
+			REPORT="${REPORT}Average time: ${INTERVAL_AVERAGE}.\n"
+			if (( $ERRORS > 1 ));then
+				REPORT="${REPORT}$ERRORS errors!"
+			elif (( $ERRORS > 0 ));then
+				REPORT="${REPORT}$ERRORS error!"
+			else
+				REPORT="${REPORT}No errors."
+			fi
+			echo -e $REPORT > stats.txt
+			THEN=$NOW
 		fi
 		
-		echo -e -n "\\r "
-		echo -n ${spinner:$i:1}
-		echo -n " $REPORT   "
+		spinner_symbol=${spinner:$i:1}
+		clear
+		echo -e "Running Stress Test ($NUMBER_OF_CLIENTS clients)  $spinner_symbol"
+		echo
+		echo -e $REPORT
+		echo
 		
 		sleep $interval
 	done
