@@ -1,0 +1,94 @@
+uses "regexp", "sys", "./tcpserver";
+
+class HttpServerRequest extends TcpServerRequest {
+	array request;
+	array headers;
+	array query;
+	
+	function parseHeaders (array lines) {
+		array headers;
+		
+		lines.each() using (h) {
+			if (h != '') {
+				array header_fragments = Regexp.split('\s*:\s*',h);
+				if (header_fragments.size() > 1) {
+					headers[header_fragments[0]] = header_fragments[1..].join(':');
+				}
+			}
+		};
+		
+		return headers;
+	}
+
+	function parseRequestCommand (string request_text) {
+		array r = Regexp.split('\s+',request_text);
+		if (r.size() == 3) {
+			array c = [
+				'text' => request_text,
+				'command' => r[0],
+				'fullpath' => r[1],
+				'proto' => r[2]
+			];
+			array q = Regexp.split('\?',c.fullpath);
+			c['path'] = q[0];
+			if (q.size() > 1) {
+				c['query_string'] = q[1];
+			}
+			else {
+				c['query_string'] = '';
+			}
+		}
+		else {
+			Sys.error('Invalid HTTP request',1);
+		}
+		return c;
+	}
+
+	function parseQueryString (string query_text) {
+		array q;
+		if (query_text != '') {
+			(Regexp.split('&',query_text)).each() using (p) {
+				array r = Regexp.split('=',p);
+				if (r.size() == 2) {
+					q[r[0]] = r[1];
+				}
+				else {
+					Sys.error('Invalid query format', 3);
+				}
+			};
+		}
+		return q;
+	}
+	
+	private function parseHttp () {
+		if (!self.request) {
+			object m = Regexp.match("\n\\s*\n",self.buffer);
+			if (m) {
+				string header_text = self.buffer[.. m.start()-1];
+				array lines = Regexp.split("\r*\n",header_text);
+				self.buffer = self.buffer[m.end()-1 ..];
+			
+				self.request = self.parseRequestCommand(lines[0]);
+				self.query = self.parseQueryString(self.request.query_string);
+				self.headers = self.parseHeaders(lines[1..]);
+			
+				self.handler.invoke(self);
+			}
+		}
+	}
+	
+	function query (string key) {
+		return self.query[key];
+	}
+	
+	function handleSocket () {
+		self.fillBuffer();
+		self.parseHttp();
+	}
+}
+
+class HttpServer extends TcpServer {
+	function createRequestObject () {
+		return new HttpServerRequest(self);
+	}
+}

@@ -1,87 +1,33 @@
 #! /usr/bin/env ferite
 
-uses "console", "network", "regexp", "sys", "posix", "reflection", "regexp";
+uses "console", "regexp", "posix", "sys", "./httpserver";
 
-class HttpRequestHandler {
-	function callback (object<HttpServerRequest> req) {}
+function either (void a, void b) {
+	if (a) return a;
+	else   return b;
 }
 
-class HttpServerRequest {
-	array request;
-	string buffer;
-	array headers;
-	object socket;
-	object<HttpRequestHandler> handler;
-	
-	function fillBuffer () {
-		while (!self.socket.eos()) {
-			string txt = self.socket.read(65536);
-			self.buffer += txt;
-		}
-	}
-	
-	function parseHeaders (array lines) {
-		array headers;
-		
-		lines.each() using (h) {
-			if (h != '') {
-				array header_fragments = Regexp.split('\s*:\s*',h);
-				if (header_fragments.size() > 1) {
-					headers[header_fragments[0]] = header_fragments[1..].join(':');
-				}
-			}
-		};
-		
-		return headers;
-	}
-	
-	function parseRequestCommand (string request_text) {
-		array r = Regexp.split('\s+',request_text);
-		if (r.size() == 3) {
-			array c = [
-				'text' => request_text,
-				'command' => r[0],
-				'fullpath' => r[1],
-				'proto' => r[2]
-			];
-			array q = Regexp.split('\?',c.fullpath);
-			c['path'] = q[0];
-			if (q.size() > 1) {
-				c['query'] = q[1];
-			}
-			else {
-				c['query'] = '';
+function handleConsole (object select_result, array commands) {
+	if (select_result != null && select_result.read.size() > 0) {
+		if (select_result.read.find(Console.stdin) >= 0) {
+			string cmd_string = Console.readln();
+			string cmd;
+			if (cmd_string != '') {
+				array args = Regexp.split('\s+',cmd_string);
+				cmd = args.shift();
+				
+				if (commands[cmd]) commands[cmd].invoke(args);
+				else               commands.unknown.invoke(cmd);
 			}
 		}
-		else {
-			Console.println("Something went wrong! ${request_text}");
-		}
-		return c;
-	}
-	
-	function parseHttp () {
-		if (!self.request) {
-			object m = Regexp.match("\n\\s*\n",self.buffer);
-			if (m) {
-				string header_text = self.buffer[.. m.start()-1];
-				array lines = Regexp.split("\r*\n",header_text);
-				self.buffer = self.buffer[m.end()-1 ..];
-			
-				self.request = self.parseRequestCommand(lines[0]);
-				self.headers = self.parseHeaders(lines[1..]);
-			
-				self.handler.callback(self);
-			}
-		}
-	}
-	
-	function handleSocket () {
-		self.fillBuffer();
-		self.parseHttp();
 	}
 }
 
-function page_counter (object req) {
+array pages, commands;
+number counter = 0;
+object myServer = new HttpServer(9090);
+
+pages['/counter'] = closure (object req) {
 	string html = "<html><body><h1>OK</h1>Count = ${counter}</body></html>";
 	array res = [
 		'HTTP/1.0 200 OK',
@@ -96,95 +42,75 @@ function page_counter (object req) {
 	
 	req.socket.print(res.join("\n"));
 	req.socket.flush();
-}
-
-function page_stress (object req) {
-	number clients = 200;
-	number poll_rate = 1;
-	if (req.request.query != '') {
-		array params = Regexp.split('&',req.request.query);
-		if (params.size() > 0) {
-			params.each() using(p) {
-				array r = Regexp.split('=',p);
-				if (r.size() == 2) {
-					switch (r[0]) {
-						case 'clients':
-							clients = r[1].toNumber();
-							break;
-						case 'rate':
-							poll_rate = r[1].toNumber();
-							break;
-					}
-				}
-			};
-		}
-	}
-	{
-		string html =
-			"<html><body><h1>Stress Test</h1>" +
-				"Simulating " + clients + " clients " +
-				"each attempting to poll every " + poll_rate + " second." +
-				"<div>" +
-					"Request per second: <span id='rate'></span> " +
-					"(long average: <span id='avg'></span>)" +
-				"</div>" +
-				"<div id='c'></div>" +
-				"<script src='http://code.jquery.com/jquery-2.1.0.min.js'></script>" +
-				"<script>" +
-				"var requests = 0;" +
-				"var total_requests = 0;" +
-				"function ajax_loop (id) {" +
-					"var then = new Date();" +
-					"$.ajax({" +
-						"type: 'get'," +
-						"url: '/counter'," +
-						"cache: false," +
-						"dataType: 'text'," +
-						"success: function (result) {" +
-							"var now = new Date();" +
-							"requests++;total_requests++;" +
-							"$('#'+id).html(" +
-								"result.match(/Count\\s*=\\s*\\d+/) + ' (' + " +
-								"(now-then) + 'ms)');" +
-							"setTimeout(function(){ajax_loop(id)}," + (poll_rate*1000) + ");" +
-						"}" +
-					"});" +
-				"};" +
-				"var lap = new Date();" +
-				"var total_lap = new Date();" +
-				"setInterval(function(){" +
-					"var now = new Date();" +
-					"var rate = requests/((now-lap)/1000);" +
-					"var avg = total_requests/((now-total_lap)/1000);" +
-					"lap = now;" +
-					"$('#rate').html(rate.toFixed(2));" +
-					"$('#avg').html(avg.toFixed(2));" +
-					"requests = 0;" +
-				"},1000);" +
-				"function make_counters (n) {" +
-					"while (n) {" +
-						"$('#c').append('<div id=\\'c' + n + '\\'></div>');" +
-						"ajax_loop('c'+n);" +
-						"n--;" +
+};
+	
+pages['/stress'] = closure (object req) {
+	number clients = (either(req.query('clients'),'200')).toNumber();
+	number poll_rate = (either(req.query('rate'),'1')).toNumber();
+	string html =
+		"<html><body><h1>Stress Test</h1>" +
+			"Simulating " + clients + " clients " +
+			"each attempting to poll every " + poll_rate + " second." +
+			"<div>" +
+				"Request per second: <span id='rate'></span> " +
+				"(long average: <span id='avg'></span>)" +
+			"</div>" +
+			"<div id='c'></div>" +
+			"<script src='http://code.jquery.com/jquery-2.1.0.min.js'></script>" +
+			"<script>" +
+			"var requests = 0;" +
+			"var total_requests = 0;" +
+			"function ajax_loop (id) {" +
+				"var then = new Date();" +
+				"$.ajax({" +
+					"type: 'get'," +
+					"url: '/counter'," +
+					"cache: false," +
+					"dataType: 'text'," +
+					"success: function (result) {" +
+						"var now = new Date();" +
+						"requests++;total_requests++;" +
+						"$('#'+id).html(" +
+							"result.match(/Count\\s*=\\s*\\d+/) + ' (' + " +
+							"(now-then) + 'ms)');" +
+						"setTimeout(function(){ajax_loop(id)}," + (poll_rate*1000) + ");" +
 					"}" +
+				"});" +
+			"};" +
+			"var lap = new Date();" +
+			"var total_lap = new Date();" +
+			"setInterval(function(){" +
+				"var now = new Date();" +
+				"var rate = requests/((now-lap)/1000);" +
+				"var avg = total_requests/((now-total_lap)/1000);" +
+				"lap = now;" +
+				"$('#rate').html(rate.toFixed(2));" +
+				"$('#avg').html(avg.toFixed(2));" +
+				"requests = 0;" +
+			"},1000);" +
+			"function make_counters (n) {" +
+				"while (n) {" +
+					"$('#c').append('<div id=\\'c' + n + '\\'></div>');" +
+					"ajax_loop('c'+n);" +
+					"n--;" +
 				"}" +
-				"make_counters(" + clients + ");" +
-				"</script>" +
-			"</body></html>";
-		array res = [
-			'HTTP/1.0 200 OK',
-			'Content-Type: text/html',
-			'Content-Length: ' + html.length(),
-			'',
-			html
-		];
-		
-		req.socket.print(res.join("\n"));
-		req.socket.flush();
-	}
-}
+			"}" +
+			"make_counters(" + clients + ");" +
+			"</script>" +
+		"</body></html>";
+	array res = [
+		'HTTP/1.0 200 OK',
+		'Content-Type: text/html',
+		'Content-Length: ' + html.length(),
+		'',
+		html
+	];
+	
+	req.socket.print(res.join("\n"));
+	req.socket.flush();
+};
 
-function page_404 (object req) {
+pages['404'] = closure (object req) {
 	string html = "<html><body><h1>ERROR 404</h1>Sorry, file not found.</body></html>";
 	array res = [
 		'HTTP/1.0 404 Not Found',
@@ -196,107 +122,48 @@ function page_404 (object req) {
 	
 	req.socket.print(res.join("\n"));
 	req.socket.flush();
-}
+};
 
-class MyServer extends HttpRequestHandler {
-	function callback (object req) {
-		switch (req.request.path) {
- 			case '/counter':
- 				page_counter(req);
- 				break;
- 			case '/stress':
- 				page_stress(req);
- 				break;
- 			default:
- 				page_404(req);
- 		}
-		
-		/*
-		Console.println(req.request.text);
-		req.headers.keys().each() using(key) {
-			Console.println(key + ' -> ' + req.headers[key]);
-		};
-		*/
-		
-		descriptors.del(descriptors.find(req.socket));
-		requests.del(getKey(req.socket));
-		
-		req.socket.close();
-		// Console.println('END OF CALLBACK ############################');
+commands['exit'] = closure (array args) {
+	Sys.exit(0);
+};
+
+commands['descriptors'] = closure (array args) {
+	Console.println(myServer.descriptors.join("\n"));
+};
+
+commands['d'] = commands.descriptors;
+
+commands['eval'] = closure (array args) {
+	monitor {
+		Console.println(eval('return ' + args.join(' ')));
 	}
-}
-
-function getKey (object con) {
-	return '' + con.getDescriptor();
-}
-
-function addHttpListener (object con, object listener) {
-	object httpservice = new HttpServerRequest();
-	
-	con.nonblock();
-	httpservice.socket = con;
-	httpservice.handler = listener;
-	requests[getKey(con)] = httpservice;
-}
-
-function addSelectDescriptor (object con) {
-	descriptors.push(con);
-}
-
-function acceptConnection (object con,object listener) {
-	object client_connection = con.accept();
-	string key = getKey(client_connection);
-	
-	// Console.println("Accepting connection on ${key}");
-	
-	addHttpListener(client_connection,listener);
-	addSelectDescriptor(client_connection);
-}
-
-function keyCheck (array a, string k) {
-	/*
-	Console.println('KEY---> ' + k);
-	Console.println('ARRAY:');
-	Console.println(a.join("\n"));
-	*/
-	return a[k];
-}
-
-function handleIncomingData (object con) {
-	string key = getKey(con);
-	if (keyCheck(requests,key)) {
-		requests[key].handleSocket();
+	handle {
+		Console.println(err);
 	}
-	
-	// Console.println('end of handleIncomingData');
-}
+};
 
-global {
-	object sock;
-	array descriptors;
-	array requests;
-	number counter;
-}
+commands['unknown'] = closure (string cmd) {
+	Console.println("Unknown command: $cmd");
+};
 
-sock = Network.TCP.bind(Network.ANY,9090);
-counter = 0;
-
-if (sock != null) {
-	object<MyServer> my_server = new MyServer(); 
-	descriptors = [ sock ];
-
-	while (1) {
-		object select_result = Posix.select(descriptors,[],[],1);
+myServer.addHandler() using(req) {
+	string path = req.request.path;
 		
-		if (select_result != null && select_result.read.size() > 0) {
-			select_result.read.each() using(con) {
-				if (con == sock) {
-					acceptConnection(con,my_server);
-				}
-				else {
-					handleIncomingData(con);
-				}
-			};
-		}
-	}
+	if (pages[path]) pages[path].invoke(req);
+	else             pages['404'].invoke(req);
+	
+	req.close();
+};
+
+while (1) {
+	array descriptors = [Console.stdin];
+	object select_result;
+	
+	descriptors=descriptors.append(myServer.descriptors);
+	
+	select_result = Posix.select(descriptors,[],[],10);
+	
+	myServer.handleSelect(select_result);
+	handleConsole(select_result,commands);
 }
