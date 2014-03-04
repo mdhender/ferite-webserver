@@ -89,9 +89,8 @@ if [ "$NUMBER_OF_CLIENTS" != "" ];then
 			THEN=$NOW
 		fi
 		
-		spinner_symbol=${spinner:$i:1}
 		clear
-		echo -e "Running Stress Test ($NUMBER_OF_CLIENTS clients)  $spinner_symbol"
+		echo -e "Running Stress Test ($NUMBER_OF_CLIENTS clients)  ${spinner:$i:1}"
 		echo
 		echo -e $REPORT
 		echo
