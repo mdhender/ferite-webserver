@@ -1,0 +1,44 @@
+uses 'posix', 'sys';
+
+namespace EventLoop {
+	array descriptors;
+	array handlers;
+	
+	function getKey (object fd) {
+		return '' + fd.getDescriptor();
+	}
+
+	function add (object fd, object h) {
+		string key = self.getKey(fd);
+		self.descriptors.push(fd);
+		self.handlers[key] = h;
+	}
+	
+	function delete (object fd) {
+		string key = self.getKey(fd);
+		if (self.handlers[key]) {
+			self.descriptors.del(self.descriptors.find(fd));
+			self.handlers.del(key);
+		}
+		fd.close();
+	}
+	
+	function listen () {
+		while (1) {
+			object select_result = Posix.select(self.descriptors,[],[],2);
+			if (select_result.read.size() > 0) {
+				select_result.read.each() using(fd) {
+					string key = self.getKey(fd);
+					if (self.handlers[key]) {
+						object h = self.handlers[key];
+						h.handleRequest();
+						
+						if (fd.eos()) {
+							self.delete(fd);
+						}
+					}
+				};
+			}
+		}	
+	}
+}

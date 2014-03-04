@@ -159,7 +159,7 @@ class HttpServerRequest extends TcpServerRequest {
 		}
 	}
 	
-	function getContent () {
+	function onPostData () {
 		object handler = recipient();
 		if (handler) {
 			self.content_handler = handler;
@@ -175,7 +175,7 @@ class HttpServerRequest extends TcpServerRequest {
 		return self.query[key];
 	}
 	
-	function handleSocket () {
+	function handleRequest () {
 		self.fillBuffer();
 		self.parseHttp();
 	}
@@ -183,6 +183,6 @@ class HttpServerRequest extends TcpServerRequest {
 
 class HttpServer extends TcpServer {
 	function createRequestObject () {
-		return new HttpServerRequest(self);
+		return new HttpServerRequest();
 	}
 }

@@ -1,123 +1,62 @@
-uses 'network', 'posix', 'sys';
+uses 'network', 'posix', 'sys', './eventloop';
 
 class TcpServerRequest {
 	string buffer;
 	object socket;
 	object handler;
-	object server;
-	
-	function constructor (object server) {
-		self.server = server;
-	}
 	
 	function fillBuffer () {
 		self.buffer += self.socket.read(524288);
 	}
 	
-	function handleSocket () {
+	function handleRequest () {
 		self.fillBuffer();
 		self.handler.invoke(self);
 	}
 	
-	function getKey () {
-		return self.server.getKey(self.socket);
-	}
-	
 	function close () {
-		self.server.descriptors.del(self.server.descriptors.find(self.socket));
-		self.server.requests.del(self.getKey());
-		
-		self.socket.close();
+		EventLoop.delete(self.socket);
 		self.socket = null;
 	}
 }
 
 class TcpServer {
-	object sock;
+	object socket;
 	object handler;
-	array descriptors;
-	array requests;
 
 	function constructor (number port) {
-		self.sock = Network.TCP.bind(Network.ANY,port);
-		if (self.sock != null) {
-			self.descriptors = [ self.sock ];
+		self.socket = Network.TCP.bind(Network.ANY,port);
+		if (self.socket != null) {
+			EventLoop.add(self.socket,self);
 		}
 		else {
 			Sys.error("Unable to open tcp port ${port}",2);
 		}
 	}
 	
-	private function acceptConnection (object server, object con, object listener) {
-		if (listener) {
-			object client_connection = con.accept();
-			string key = server.getKey(client_connection);
-			object request = server.createRequestObject();
-			
-			client_connection.nonblock();
-			request.socket = client_connection;
-			request.handler = listener;
-			server.requests[key] = request;
-			server.descriptors.push(client_connection);
-		}
-		else {
-			Sys.error('No listener to attach',1);
-		}
-	}
-	
-	function getKey (object con) {
-		return '' + con.getDescriptor();
-	}
-	
 	function createRequestObject () {
-		return new TcpServerRequest(self);
+		return new TcpServerRequest();
 	}
 	
-	function addHandler (object handler) {
+	function onRequest (object handler) {
 		self.handler = handler;
 	}
 	
-	function addHandler () {
+	function onRequest () {
 		object handler = recipient();
 		if (handler) {
-			self.addHandler(handler);
+			self.onRequest(handler);
 		}
 	}
 	
-	function handleSelect (object select_result) {
-		if (self.handler && select_result != null) {
-			if (select_result.read.size() > 0) {
-				select_result.read.each() using(con) {
-					if (con == self.sock) {
-						self.acceptConnection(self,con,self.handler);
-					}
-					else {
-						string key = self.getKey(con);
-						if (self.requests[key]) {
-							object tcp_request = self.requests[key];
-							tcp_request.handleSocket();
-							
-							// Cleanup broken connections:
-							if (tcp_request.socket) {
-								if (tcp_request.socket.eos()) {
-									tcp_request.close();
-								}
-							}
-						}
-					}
-				};
-			}
-		}
-	}
-
-	function listen () {
-		object handler = recipient();
-		if (handler) {
-			self.addHandler(handler);
-		}
+	function handleRequest () {
+		object client_connection = self.socket.accept();
+		object request = self.createRequestObject();
 		
-		while (1) {
-			self.handleSelect(Posix.select(self.descriptors,[],[],2));
-		}
+		client_connection.nonblock();
+		request.socket = client_connection;
+		request.handler = self.handler;
+		
+		EventLoop.add(client_connection,request);
 	}
 }
