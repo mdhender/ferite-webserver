@@ -6,17 +6,17 @@ class TcpServerRequest {
 	object handler;
 	
 	function fillBuffer () {
-		self.buffer += self.socket.read(524288);
+		.buffer += .socket.read(524288);
 	}
 	
 	function handleRequest () {
-		self.fillBuffer();
-		self.handler.invoke(self);
+		.fillBuffer();
+		.handler.invoke(self);
 	}
 	
 	function close () {
-		EventLoop.delete(self.socket);
-		self.socket = null;
+		EventLoop.delete(.socket);
+		.socket = null;
 	}
 }
 
@@ -25,9 +25,9 @@ class TcpServer {
 	object handler;
 
 	function constructor (number port) {
-		self.socket = Network.TCP.bind(Network.ANY,port);
-		if (self.socket != null) {
-			EventLoop.add(self.socket,self);
+		.socket = Network.TCP.bind(Network.ANY,port);
+		if (.socket != null) {
+			EventLoop.add(.socket,self);
 		}
 		else {
 			Sys.error("Unable to open tcp port ${port}",2);
@@ -39,23 +39,23 @@ class TcpServer {
 	}
 	
 	function onRequest (object handler) {
-		self.handler = handler;
+		.handler = handler;
 	}
 	
 	function onRequest () {
 		object handler = recipient();
 		if (handler) {
-			self.onRequest(handler);
+			.onRequest(handler);
 		}
 	}
 	
 	function handleRequest () {
-		object client_connection = self.socket.accept();
-		object request = self.createRequestObject();
+		object client_connection = .socket.accept();
+		object request = .createRequestObject();
 		
 		client_connection.nonblock();
 		request.socket = client_connection;
-		request.handler = self.handler;
+		request.handler = .handler;
 		
 		EventLoop.add(client_connection,request);
 	}

@@ -13,29 +13,29 @@ class ConsoleServer {
 	function handleRequest () {
 		string cmd_string = Console.readln();
 		string cmd;
-		if (cmd_string != '') {
-			array args = Regexp.split('\s+',cmd_string);
-			cmd = args.shift();
+		array args = Regexp.split('\s+',cmd_string);
+		cmd = args.shift();
 			
-			if (self.commands[cmd]) self.commands[cmd].invoke(args);
-			else                    self.commands.unknown.invoke(cmd);
-		}
+		if (cmd && .commands[cmd])
+			.commands[cmd].invoke(args);
+		else
+			.commands.unknown.invoke(cmd);
 	}
 	
 	function constructor () {
 		Console.stdin.nonblock();
 		
-		self.commands['exit'] = closure (array args) {
+		.commands['exit'] = closure (array args) {
 			Sys.exit(0);
 		};
 
-		self.commands['descriptors'] = closure (array args) {
+		.commands['descriptors'] = closure (array args) {
 			Console.println(EventLoop.descriptors.join("\n"));
 		};
 
-		self.commands['d'] = self.commands.descriptors;
+		.commands['d'] = .commands.descriptors;
 
-		self.commands['eval'] = closure (array args) {
+		.commands['eval'] = closure (array args) {
 			monitor {
 				Console.println(eval('return ' + args.join(' ')));
 			}
@@ -44,7 +44,7 @@ class ConsoleServer {
 			}
 		};
 
-		self.commands['unknown'] = closure (string cmd) {
+		.commands['unknown'] = closure (string cmd) {
 			Console.println("Unknown command: $cmd");
 		};
 		
