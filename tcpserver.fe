@@ -49,6 +49,17 @@ class TcpServer {
 		}
 	}
 	
+	function listen () {
+		object handler = recipient();
+		if (handler) {
+			.onRequest(handler);
+			EventLoop.listen();
+		}
+		else {
+			// Error here
+		}
+	}
+	
 	function handleRequest () {
 		object client_connection = .socket.accept();
 		object request = .createRequestObject();
