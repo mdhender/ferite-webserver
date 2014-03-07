@@ -3,6 +3,9 @@ uses 'regexp', 'sys', 'date', './tcpserver';
 class HttpServerRequest extends TcpServerRequest {
 	array request;
 	array headers;
+	array out_headers;
+	array cookies;
+	array out_cookies;
 	array query;
 	private string httpDateFormat = '%a, %d %b %Y %H:%M:%S %z GMT';
 	private object content_handler;
@@ -46,7 +49,7 @@ class HttpServerRequest extends TcpServerRequest {
 				'text' => request_text,
 				'method' => r[0],
 				'fullpath' => r[1],
-				'proto' => r[2]
+				'protocol' => r[2]
 			];
 			array q = Regexp.split('\?',c.fullpath);
 			c['path'] = q[0];
@@ -178,6 +181,319 @@ class HttpServerRequest extends TcpServerRequest {
 	function handleRequest () {
 		.fillBuffer();
 		.parseHttp();
+	}
+	
+	/**
+	 * @function contentType
+	 * @declaration function contentType(string) 
+	 * @brief  Set the content-type HTTP-header for this request 
+	 * @param string
+	 */
+	function contentType(string type)  {
+		.out_headers['Content-Type'] = type;
+	}
+	
+	/**
+	 * @function cookies
+	 * @declaration function cookies() 
+	 * @brief  Retreive the cookies returned by the client 
+	 */
+	function cookies()  {
+		if (! .cookies.size() && .headers.cookie ) {
+			array cc = Regexp.split('\s*;\s*', .headers.cookie);
+			.cc.each() using (c) {
+				array key_val = Regexp.split('=',c);
+				if (key_val) .cookies[key_val[0]] = key_val[1];
+			};
+		}
+		return .cookies;
+	}
+	
+	/**
+	 * @function current
+	 * @declaration function current() 
+	 * @brief  Return an instance of the current http request. 
+	 */
+	function current()  {
+		return self; // Note: this is essentially unimplemented.
+	}
+	
+	/**
+	 * @function documentRoot
+	 * @declaration function documentRoot() 
+	 * @brief  returns the servers document root 
+	 */
+	function documentRoot()  {
+	}
+	
+	/**
+	 * @function filename
+	 * @declaration function filename() 
+	 * @brief  The full filepath + filename 
+	 */
+	function filename()  {
+	}
+	
+	/**
+	 * @function filepath
+	 * @declaration function filepath() 
+	 * @brief  Full filepath of the script. 
+	 */
+	function filepath()  {
+	}
+	
+	/**
+	 * @function fullUri
+	 * @declaration function fullUri() 
+	 * @brief  Returns the entire uri. 
+	 */
+	function fullUri()  {
+		return .request.fullpath;
+	}
+	
+	/**
+	 * @function getParams
+	 * @declaration function getParams(string) 
+	 * @brief  This function will fetch all parameters passed via the request that match a given name and return an array. 
+	 * @param string
+	 */
+	function getParams(string key)  {
+		return .query[key];
+	}
+	
+	/**
+	 * @function hostname
+	 * @declaration function hostname() 
+	 * @brief  Retrieve the hostname of the running server 
+	 */
+	function hostname()  {
+	}
+	
+	/**
+	 * @function inHeaders
+	 * @declaration function inHeaders(string) 
+	 * @brief  Retrieve a selected HTTP-header 
+	 * @param string
+	 */
+	function inHeaders(string key)  {
+		return .headers[key];
+	}
+	
+	/**
+	 * @function location
+	 * @declaration function location(string) 
+	 * @brief  Send a 302 to the browser 
+	 * @param string
+	 */
+	function location(string url)  {
+		array res = [
+			'HTTP/1.0 302 Found',
+			'Location: ' + url,
+			''
+		];
+		
+		.socket.print(res.join("\n"));
+		.socket.flush();
+		EventLoop.delete(.socket);
+	}
+	
+	/**
+	 * @function logError
+	 * @declaration function logError(string) 
+	 * @brief  Log an error in apaches error log. 
+	 * @param string
+	 */
+	function logError(string message)  {
+	}
+	
+	/**
+	 * @function method
+	 * @declaration function method() 
+	 * @brief  Retreive the method used for the request and later be written to the browser. 
+	 */
+	function method()  {
+		return .request.method;
+	}
+	
+	/**
+	 * @function noCache
+	 * @declaration function noCache() 
+	 * @brief  Set correct headers and tell the client to not stor this page in a cache. 
+	 */
+	function noCache()  {
+		.out_headers['Expires'] = '0';
+		.out_headers['Pragma'] = 'no-cache';
+		.out_headers['Cache-Control'] = 'no-store, no-cache, must-revalidate';
+	}
+	
+	/**
+	 * @function outHeaders
+	 * @declaration function outHeaders(string key,string value) 
+	 * @brief  set the specified value of an HTTP- header 
+	 * @param key, value
+	 */
+	function outHeaders(string key,string value)  {
+		.out_headers[key] = value;
+	}
+	
+	/**
+	 * @function parsedUri
+	 * @declaration function parsedUri() 
+	 * @brief  Return the path portion of the uri 
+	 */
+	function parsedUri()  {
+		return .request.path;
+	}
+	
+	/**
+	 * @function pathInfo
+	 * @declaration function pathInfo() 
+	 * @brief  If you have a request like http://example.com/index.fe/Hi, this function will return "/Hi" 
+	 */
+	function pathInfo()  {
+		return Regexp.match('[^/]*$',.request.path).match();
+	}
+	
+	/**
+	 * @function print
+	 * @declaration function print(string) 
+	 * @brief  Print a string to the browser 
+	 * @param string
+	 */
+	function print(string text)  {
+	}
+	
+	/**
+	 * @function query
+	 * @declaration function query() 
+	 * @brief  Fetch the query name and values 
+	 */
+	function query()  {
+		return .query;
+	}
+	
+	/**
+	 * @function queryString
+	 * @declaration function queryString() 
+	 * @brief  Retrieve the unmodified query string 
+	 */
+	function queryString()  {
+		return .request.query_string;
+	}
+	
+	/**
+	 * @function redirectURL
+	 * @declaration function redirectURL() 
+	 * @brief  returns the redirected url 
+	 */
+	function redirectURL()  {
+	}
+	
+	/**
+	 * @function referer
+	 * @declaration function referer() 
+	 * @brief  The url in the referer header. 
+	 */
+	function referer()  {
+		return .headers['referer'];
+	}
+	
+	/**
+	 * @function remoteHost
+	 * @declaration function remoteHost() 
+	 * @brief  The name of the remote host if possible 
+	 */
+	function remoteHost()  {
+	}
+	
+	/**
+	 * @function remoteIp
+	 * @declaration function remoteIp() 
+	 * @brief  Fetch the remote hosts ip. 
+	 */
+	function remoteIp()  {
+		return .socket.remoteip;
+	}
+	
+	/**
+	 * @function scriptname
+	 * @declaration function scriptname() 
+	 * @brief  The name of the running script 
+	 */
+	function scriptname()  {
+	}
+	
+	/**
+	 * @function serverRoot
+	 * @declaration function serverRoot() 
+	 * @brief  returns the server root 
+	 */
+	function serverRoot()  {
+	}
+	
+	/**
+	 * @function setCookie
+	 * @declaration function setCookie(string) 
+	 * @brief  Send a coookie to the client browser. 
+	 * @param string
+	 */
+	function setCookie(string cookie)  {
+	}
+	
+	/**
+	 * @function uniqueId
+	 * @declaration function uniqueId() 
+	 * @brief  return a unique id 
+	 */
+	function uniqueId()  {
+	}
+	
+	/**
+	 * @function uri
+	 * @declaration function uri() 
+	 * @brief  Retrieve the accual unparsed uri for the request 
+	 */
+	function uri()  {
+	}
+	
+	/**
+	 * @function urlDecode
+	 * @declaration function urlDecode(string) 
+	 * @brief  Decode an url encoded string. 
+	 * @param string
+	 */
+	function urlDecode(string url)  {
+	}
+	
+	/**
+	 * @function urlEncode
+	 * @declaration function urlEncode(string) 
+	 * @brief  Url encode a string 
+	 * @param string
+	 */
+	function urlEncode(string url)  {
+	}
+	
+	/**
+	 * @function userAgent
+	 * @declaration function userAgent() 
+	 * @brief  The name of clients user agent 
+	 */
+	function userAgent()  {
+	}
+	
+	function respond (string body) {
+		array res = ['HTTP/1.0 200 OK'];
+		.out_headers['Date'] = .timestamp();
+		.out_headers['Content-Length'] = body.length();
+		.out_headers.keys().each() using (key) {
+			res.push("${key}: ${.out_headers[key]}");
+		};
+		res.push('');
+		res.push(body);
+		
+		.socket.print(res.join("\n"));
+		.socket.flush();
 	}
 }
 

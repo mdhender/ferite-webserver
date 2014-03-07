@@ -36,19 +36,11 @@ commandLine.command('unknown') using (cmd) {
 
 pages['/counter'] = closure (object req) {
 	string html = "<html><body><h1>OK</h1>Count = ${counter}</body></html>";
-	array res = [
-		'HTTP/1.0 200 OK',
-		'Content-Type: text/html',
-		'Content-Length: ' + html.length(),
-		'',
-		html
-	];
-	
 	// Console.println("count = ${counter}");
 	counter ++;
 	
-	req.socket.print(res.join("\n"));
-	req.socket.flush();
+	req.contentType('text/html');
+	req.respond(html);
 };
 
 pages['/setcounter'] = closure (object req) {
@@ -87,15 +79,8 @@ pages['renderSetCounter'] = closure (object req) {
 				"</div>" +
 			"</form>" +
 		"</body></html>";
-	array res = [
-		'HTTP/1.0 200 OK',
-		'Content-Type: text/html',
-		'Content-Length: ' + html.length(),
-		'',
-		html
-	];
-	req.socket.print(res.join("\n"));
-	req.socket.flush();
+	req.contentType('text/html');
+	req.respond(html);
 };
 	
 pages['/stress'] = closure (object req) {
@@ -152,16 +137,8 @@ pages['/stress'] = closure (object req) {
 			"make_counters(" + clients + ");" +
 			"</script>" +
 		"</body></html>";
-	array res = [
-		'HTTP/1.0 200 OK',
-		'Content-Type: text/html',
-		'Content-Length: ' + html.length(),
-		'',
-		html
-	];
-	
-	req.socket.print(res.join("\n"));
-	req.socket.flush();
+	req.contentType('text/html');
+	req.respond(html);
 };
 
 pages['404'] = closure (object req) {
