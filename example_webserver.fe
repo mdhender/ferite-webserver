@@ -1,63 +1,38 @@
 #! /usr/bin/env ferite
 
-uses 'console', 'regexp', 'posix', 'sys', './httpserver';
+uses 'console', 'regexp', 'posix', 'sys', 'httpserver', 'consoleserver';
 
 function either (void a, void b) {
 	if (a) return a;
 	else   return b;
 }
 
-class ConsoleServer {
-	array commands;
-	
-	function handleRequest () {
-		string cmd_string = Console.readln();
-		string cmd;
-		if (cmd_string != '') {
-			array args = Regexp.split('\s+',cmd_string);
-			cmd = args.shift();
-			
-			if (cmd && .commands[cmd])
-				.commands[cmd].invoke(args);
-			else
-				.commands.unknown.invoke(cmd);
-		}
-	}
-	
-	function constructor () {
-		Console.stdin.nonblock();
-		
-		.commands['exit'] = closure (array args) {
-			Sys.exit(0);
-		};
-
-		.commands['descriptors'] = closure (array args) {
-			Console.println(EventLoop.descriptors.join("\n"));
-		};
-
-		.commands['d'] = .commands.descriptors;
-
-		.commands['eval'] = closure (array args) {
-			monitor {
-				Console.println(eval('return ' + args.join(' ')));
-			}
-			handle {
-				Console.println(err);
-			}
-		};
-
-		.commands['unknown'] = closure (string cmd) {
-			Console.println("Unknown command: $cmd");
-		};
-		
-		EventLoop.add(Console.stdin,self);
-	}
-}
-
 array pages;
 number counter = 0;
 object myServer = new HttpServer(9090);
 object commandLine = new ConsoleServer();
+
+commandLine.command('exit') using (args) {
+	Sys.exit(0);
+};
+
+commandLine.command('d','descriptors') using (args) {
+	Console.println(EventLoop.descriptors.join("\n"));
+};
+
+commandLine.command('eval') using (args) {
+	monitor {
+		Console.println(eval('return ' + args.join(' ')));
+	}
+	handle {
+		Console.println(err);
+	}
+};
+
+commandLine.command('unknown') using (cmd) {
+	Console.println("Unknown command: $cmd");
+};
+		
 
 pages['/counter'] = closure (object req) {
 	string html = "<html><body><h1>OK</h1>Count = ${counter}</body></html>";
