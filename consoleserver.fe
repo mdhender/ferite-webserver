@@ -1,0 +1,38 @@
+#! /usr/bin/env ferite
+
+uses 'console', 'eventloop';
+
+class ConsoleServer {
+	array commands;
+	
+	function handleRequest () {
+		string cmd_string = Console.readln();
+		string cmd;
+		if (cmd_string != '') {
+			array args = Regexp.split('\s+',cmd_string);
+			cmd = args.shift();
+			
+			if (cmd && .commands[cmd])
+				.commands[cmd].invoke(args);
+			else if (.commands['unknown'])
+				.commands.unknown.invoke(cmd);
+			else
+				Console.println("Unknown command: $cmd");
+		}
+	}
+	
+	function command (...) {
+		object handler = recipient();
+		if (handler) {
+			array names = arguments();
+			names.each() using (n) {
+				.commands[n] = handler;
+			};
+		}
+	}
+	
+	function constructor () {
+		Console.stdin.nonblock();
+		EventLoop.add(Console.stdin,self);
+	}
+}
