@@ -143,16 +143,8 @@ pages['/stress'] = closure (object req) {
 
 pages['404'] = closure (object req) {
 	string html = "<html><body><h1>ERROR 404</h1>Sorry, file not found.</body></html>";
-	array res = [
-		'HTTP/1.0 404 Not Found',
-		'Content-Type: text/html',
-		'Content-Length: ' + html.length(),
-		'',
-		html
-	];
-	
-	req.socket.print(res.join("\n"));
-	req.socket.flush();
+	req.contentType('text/html');
+	req.respond(404,html);
 };
 
 myServer.onRequest() using(req) {

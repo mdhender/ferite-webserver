@@ -1,5 +1,9 @@
 uses 'regexp', 'sys', 'date', './tcpserver';
 
+global {
+	array _httpStatusCode_;
+}
+
 class HttpServerRequest extends TcpServerRequest {
 	array request;
 	array headers;
@@ -483,7 +487,17 @@ class HttpServerRequest extends TcpServerRequest {
 	}
 	
 	function respond (string body) {
-		array res = ['HTTP/1.0 200 OK'];
+		.respond(200,body);
+	}
+	
+	function respond (number code, string body) {
+		array res;
+		string status_code = ''+code;
+		string status_text = '';
+		if (_httpStatusCode_[status_code]) {
+			status_text = _httpStatusCode_[status_code];
+		}
+		res.push("HTTP/1.0 $status_code $status_text");
 		.out_headers['Date'] = .timestamp();
 		.out_headers['Content-Length'] = body.length();
 		.out_headers.keys().each() using (key) {
@@ -501,4 +515,25 @@ class HttpServer extends TcpServer {
 	function createRequestObject () {
 		return new HttpServerRequest();
 	}
+
 }
+
+_httpStatusCode_ = [
+		'100' => 'Continue',
+		'200' => 'OK',
+		'201' => 'Created',
+		'202' => 'Accepted',
+		'204' => 'No Content',
+		'301' => 'Moved Permanently',
+		'302' => 'Found',
+		'303' => 'See Other',
+		'304' => 'Not Modified',
+		'307' => 'Temporary Redirect',
+		'308' => 'Permanent Redirect',
+		'400' => 'Bad Request',
+		'401' => 'Unauthorized',
+		'403' => 'Forbidden',
+		'404' => 'Not Found',
+		'500' => 'Internal Server Error',
+		'501' => 'Not Implemented'
+];
