@@ -4,6 +4,7 @@ uses 'console', 'eventloop';
 
 class ConsoleServer {
 	array commands;
+	string prompt;
 	
 	function handleRequest () {
 		string cmd_string = Console.readln();
@@ -23,6 +24,14 @@ class ConsoleServer {
 				Console.println("Unknown command: $cmd");
 			}
 		}
+		Console.print(.prompt);
+		Console.stdout.flush();
+	}
+	
+	function prompt (string text) {
+		.prompt = text;
+		Console.print(.prompt);
+		Console.stdout.flush();
 	}
 	
 	function command (...) {
