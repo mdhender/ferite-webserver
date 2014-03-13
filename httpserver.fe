@@ -19,6 +19,7 @@ class HttpServerRequest extends TcpServerRequest {
 		// Note: Header names are converted to lower case for consistency
 		
 		lines.each() using (h) {
+			h = Regexp.replace('[^[:print:]]',h,''); // remove garbage characters
 			if (h != '') {
 				array header_fragments = Regexp.split('\s*:\s*',h);
 				if (header_fragments.size() > 1) {
@@ -38,7 +39,6 @@ class HttpServerRequest extends TcpServerRequest {
 				}
 			}
 		};
-		
 		return headers;
 	}
 	
@@ -55,7 +55,7 @@ class HttpServerRequest extends TcpServerRequest {
 				'fullpath' => r[1],
 				'protocol' => r[2]
 			];
-			array q = Regexp.split('\?',c.fullpath);
+			array q = c.fullpath.toArray('?');
 			c['path'] = q[0];
 			if (q.size() > 1) {
 				c['query_string'] = q[1];
@@ -73,13 +73,12 @@ class HttpServerRequest extends TcpServerRequest {
 	function parseQueryString (string query_text) {
 		array q;
 		if (query_text != '') {
-			(Regexp.split('&',query_text)).each() using (p) {
-				array r = Regexp.split('=',p);
+			query_text.toArray('&').each() using (p) {
+				array r = p.toArray('=');
 				if (r.size() == 2) {
-					q[r[0]] = r[1];
-				}
-				else {
-					Sys.error('Invalid query format', 3);
+					q[r[0]] = Regexp
+						.replaceAll('%([0-9a-fA-F]{2})',r[1],'\x\1')
+						.unescape();
 				}
 			};
 		}
@@ -205,9 +204,9 @@ class HttpServerRequest extends TcpServerRequest {
 	function cookies()  {
 		if (! .cookies.size() && .headers.cookie ) {
 			array cc = Regexp.split('\s*;\s*', .headers.cookie);
-			.cc.each() using (c) {
-				array key_val = Regexp.split('=',c);
-				if (key_val) .cookies[key_val[0]] = key_val[1];
+			cc.each() using (c) {
+				object m = Regexp.match('([^=]+)=(.*)',c);
+				if (m) .cookies[m.capture(0)] = m.capture(1);
 			};
 		}
 		return .cookies;
@@ -455,7 +454,7 @@ class HttpServerRequest extends TcpServerRequest {
 	/**
 	 * @function uri
 	 * @declaration function uri() 
-	 * @brief  Retrieve the accual unparsed uri for the request 
+	 * @brief  Retrieve the actual unparsed uri for the request 
 	 */
 	function uri()  {
 	}
