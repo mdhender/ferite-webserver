@@ -12,12 +12,16 @@ class ConsoleServer {
 			array args = Regexp.split('\s+',cmd_string);
 			cmd = args.shift();
 			
-			if (cmd && .commands[cmd])
+			if (cmd && .commands[cmd]) {
 				.commands[cmd].invoke(args);
-			else if (.commands['unknown'])
-				.commands.unknown.invoke(cmd);
-			else
+			}
+			else if (.commands['unknown']) {
+				args.unshift(cmd);
+				.commands.unknown.invoke(args);
+			}
+			else {
 				Console.println("Unknown command: $cmd");
+			}
 		}
 	}
 	
