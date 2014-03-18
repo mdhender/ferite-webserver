@@ -5,12 +5,14 @@ global {
 }
 
 class HttpServerRequest extends TcpServerRequest {
+	number sync_post = 0;
 	array request;
 	array headers;
 	array out_headers;
 	array cookies;
 	array out_cookies;
 	array query;
+	string post_data;
 	private string httpDateFormat = '%a, %d %b %Y %H:%M:%S %z GMT';
 	private object content_handler;
 	
@@ -86,9 +88,13 @@ class HttpServerRequest extends TcpServerRequest {
 	}
 	
 	private function cleanup () {
-		.headers = [];
 		.request = [];
+		.headers = [];
+		.out_headers = [];
+		.cookies = [];
+		.out_cookies = [];
 		.query = [];
+		.post_data = '';
 	}
 	
 	private function processContentLength () {
@@ -96,17 +102,27 @@ class HttpServerRequest extends TcpServerRequest {
 		number content_length = .headers.content_length;
 		
 		if (buffer_length >= content_length) {
-			string content;
-			
 			if (buffer_length > content_length) {
-				content = .buffer[.. content_length];
+				.post_data = .buffer[.. content_length];
 				.buffer = .buffer[content_length+1 ..];
 			}
 			else {
-				content = .buffer;
+				.post_data = .buffer;
 				.buffer = '';
 			}
-			.content_handler.invoke(self,content);
+			if (
+				.headers['content_type'] != null &&
+				.headers.content_type == 'application/x-www-form-urlencoded'
+			) {
+				.parseQueryString(.post_data);
+			}
+			
+			if (.sync_post) {
+				.handler.invoke(self);
+			}
+			else {
+				.content_handler.invoke(self,.post_data);
+			}
 			.cleanup();
 		}
 	}
@@ -116,15 +132,19 @@ class HttpServerRequest extends TcpServerRequest {
 	}
 	
 	private function processPOST () {
-		if (.content_handler) {
+		if (.content_handler || (.sync_post && .handler)) {
 			array h = .headers;
 			
-			if (h['content_length'] != null) {
-				if (h.content_length > 0)
-					.processContentLength();
+			if (
+				h['content_length'] != null &&
+				h.content_length > 0
+			) {
+				.processContentLength();
 			}
-			else if (h['transfer_encoding'] != null) {
-				if (h.transfer_encoding == 'chunked')
+			else if (
+				h['transfer_encoding'] != null &&
+				h.transfer_encoding == 'chunked'
+			) {
 					.processChunked();
 			}
 		}
@@ -146,8 +166,9 @@ class HttpServerRequest extends TcpServerRequest {
 				.request = .parseRequestCommand(lines[0]);
 				.query = .parseQueryString(.request.query_string);
 				.headers = .parseHeaders(lines[1..]);
-			
-				.handler.invoke(self);
+				
+				if (!(.request.method == 'POST' && .sync_post))
+					.handler.invoke(self);
 			}
 		}
 		
@@ -511,10 +532,13 @@ class HttpServerRequest extends TcpServerRequest {
 }
 
 class HttpServer extends TcpServer {
+	number sync_post = 0;
+	
 	function createRequestObject () {
-		return new HttpServerRequest();
+		object req = new HttpServerRequest();
+		req.sync_post = .sync_post;
+		return req;
 	}
-
 }
 
 _httpStatusCode_ = [
