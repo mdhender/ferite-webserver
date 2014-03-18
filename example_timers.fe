@@ -1,0 +1,17 @@
+#! /usr/bin/env ferite
+
+uses 'eventloop', 'console';
+
+number n = 1;
+number id = EventLoop.every(0.5) using {
+	Console.println('wake up! ' + (n++));
+	if (n > 10) {
+		EventLoop.cancel(id);
+	}
+};
+
+EventLoop.after(3) using {
+	Console.println('HELLO!');
+};
+
+EventLoop.listen();

@@ -3,6 +3,11 @@ uses 'posix', 'sys';
 namespace EventLoop {
 	array descriptors;
 	array handlers;
+	array timers; /* [ expire:number, callback:closure, reschedule:number, id:number ] */
+	number now; /* current epoch */
+	number next_id = 0;
+	
+	number DEFAULT_SLEEP_TIME = 30;
 	
 	function getKey (object fd) {
 		return '' + fd.getDescriptor();
@@ -23,9 +28,75 @@ namespace EventLoop {
 		fd.close();
 	}
 	
+	function after (number period) {
+		object handler = recipient();
+		number id = .next_id++;
+		if (handler) {
+			.timers.push([
+				'expire' => .now + period,
+				'callback' => handler,
+				'id' => id,
+				'reschedule' => 0
+			]);
+		}
+		return id;
+	}
+	
+	function every (number period) {
+		object handler = recipient();
+		number id = .next_id++;
+		if (handler) {
+			.timers.push([
+				'expire' => .now + period,
+				'callback' => handler,
+				'id' => id,
+				'reschedule' => period
+			]);
+		}
+		return id;
+	}
+	
+	function cancel (number id) {
+		.timers.each() using (t) {
+			if (t.id == id) {
+				.timers.del(.timers.find(t));
+				return;
+			}
+		};
+	}
+	
+	function _calculateSleep () {
+		if (.timers.size() > 0) {
+			number sleep_time;
+			number earliest = .timers[0].expire;
+			// Find smallest sleep interval:
+			if (.timers.size() > 1) {
+				.timers[1..].each() using (t) {
+					if (t.expire < earliest) {
+						earliest = t.expire;
+					}
+				};
+			}
+			
+			sleep_time = earliest - .now;
+			if (sleep_time <= 0) {
+				sleep_time = 0;
+			}
+			if (sleep_time > .DEFAULT_SLEEP_TIME) {
+				sleep_time = .DEFAULT_SLEEP_TIME;
+			}
+			return sleep_time;
+		}
+		else {
+			return .DEFAULT_SLEEP_TIME;
+		}
+	}
+	
 	function listen () {
-		while (1) {
-			object select_result = Posix.select(.descriptors,[],[],2);
+		while (.descriptors.size() || .timers.size()) {
+			number i;
+			object select_result = Posix.select(.descriptors,[],[],._calculateSleep());
+			.now = Sys.timestamp();
 			if (select_result.read.size() > 0) {
 				select_result.read.each() using(fd) {
 					string key = .getKey(fd);
@@ -39,6 +110,22 @@ namespace EventLoop {
 					}
 				};
 			}
+			// Can't use .each() because it passes objects by copy
+			for (i=0;i<.timers.size();i++) {
+				if (.timers[i].expire <= .now) {
+					array t = .timers[i];
+					if (t.reschedule > 0) {
+						.timers[i].expire = .now + t.reschedule;
+					}
+					else {
+						.timers.del(i);
+						i--;
+					}
+					t.callback.invoke();
+				}
+			}
 		}	
 	}
 }
+
+EventLoop.now = Sys.timestamp();
