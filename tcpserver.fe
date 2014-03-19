@@ -26,6 +26,7 @@ class TcpServer {
 
 	function constructor (number port) {
 		.socket = Network.TCP.bind(Network.ANY,port);
+		.socket.nonblock();
 		if (.socket != null) {
 			EventLoop.add(.socket,self);
 		}
