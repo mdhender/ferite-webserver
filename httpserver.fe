@@ -113,7 +113,7 @@ class HttpServerRequest extends TcpServerRequest {
 			}
 			if (
 				.headers['content_type'] != null &&
-				.headers.content_type == 'application/x-www-form-urlencoded'
+				.headers.content_type.index('x-www-form-urlencoded') > -1
 			) {
 				.parseQueryString(.post_data);
 			}
