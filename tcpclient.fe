@@ -1,0 +1,63 @@
+uses 'network', 'posix', 'sys', './eventloop';
+
+class TcpClient {
+	string buffer;
+	object socket;
+	object handler;
+	
+	function print (string txt) {
+		.socket.print(txt);
+	}
+	
+	function println (string txt) {
+		.socket.println(txt);
+	}
+	
+	function fillBuffer () {
+		.buffer += .socket.read(524288);
+	}
+	
+	function handleRequest () {
+		.fillBuffer();
+		.handler.invoke(self);
+	}
+	
+	function close () {
+		EventLoop.delete(.socket);
+		.socket = null;
+	}
+
+	function constructor (string host, number port) {
+		.socket = Network.TCP.connect(host, port, Network.AF_IPV4);
+		.socket.nonblock();
+		if (.socket != null) {
+			EventLoop.add(.socket,self);
+		}
+		else {
+			Sys.error("Unable to connect to ${host}:${port}",2);
+		}
+	}
+	
+	function onResponse (object handler) {
+		.handler = handler;
+	}
+	
+	function onResponse () {
+		object handler = recipient();
+		if (handler) {
+			.onResponse(handler);
+		}
+	}
+	
+	function singleRequest (string txt) {
+		object handler = recipient();
+		if (handler) {
+			.onResponse(handler);
+			.print(txt);
+			EventLoop.listen();
+		}
+		else {
+			// Error here
+		}
+	}
+}

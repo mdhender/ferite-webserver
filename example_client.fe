@@ -1,0 +1,29 @@
+#! /usr/bin/env ferite
+
+uses 'console', 'regexp', 'posix', 'sys', 'tcpclient';
+
+object google = new TcpClient('www.google.com',80);
+object arstechnica = new TcpClient('www.arstechnica.com',80);
+string get = [
+	'GET / HTTP/1.0',
+	''
+].join("\n");
+
+google.onResponse() using (res) {
+	Console.println("================================== GOOGLE");
+	Console.println(''+res.buffer.length());
+	res.buffer = '';
+};
+
+arstechnica.onResponse() using (res) {
+	Console.println("================================== ARSTECHNICA");
+	Console.println(''+res.buffer.length());
+	res.buffer = '';
+};
+
+google.println(get);
+arstechnica.println(get);
+
+EventLoop.listen();
+
+Console.println('');
