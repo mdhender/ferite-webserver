@@ -73,18 +73,19 @@ class HttpServerRequest extends TcpServerRequest {
 	}
 
 	function parseQueryString (string query_text) {
-		array q;
 		if (query_text != '') {
 			query_text.toArray('&').each() using (p) {
 				array r = p.toArray('=');
 				if (r.size() == 2) {
-					q[r[0]] = Regexp
+					.query[r[0]] = Regexp
 						.replaceAll('%([0-9a-fA-F]{2})',r[1],'\x\1')
 						.unescape();
 				}
+				else if (r.size() == 1) {
+					.query[r[0]] = '';
+				}
 			};
 		}
-		return q;
 	}
 	
 	private function cleanup () {
@@ -164,7 +165,7 @@ class HttpServerRequest extends TcpServerRequest {
 				}
 			
 				.request = .parseRequestCommand(lines[0]);
-				.query = .parseQueryString(.request.query_string);
+				.parseQueryString(.request.query_string);
 				.headers = .parseHeaders(lines[1..]);
 				
 				if (!(.request.method == 'POST' && .sync_post))
