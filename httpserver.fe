@@ -224,7 +224,7 @@ class HttpServerRequest extends TcpServerRequest {
 	 * @brief  Retreive the cookies returned by the client 
 	 */
 	function cookies()  {
-		if (! .cookies.size() && .headers.cookie ) {
+		if (! .cookies.size() && .headers['cookie'] ) {
 			array cc = Regexp.split('\s*;\s*', .headers.cookie);
 			cc.each() using (c) {
 				object m = Regexp.match('([^=]+)=(.*)',c);
