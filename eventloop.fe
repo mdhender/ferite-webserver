@@ -92,6 +92,15 @@ namespace EventLoop {
 		}
 	}
 	
+	function stop () {
+		.descriptors.each() using (d) {
+			.delete(d);
+		};
+		.timers.each() using (t) {
+			.timers.del(.timers.find(t));
+		};
+	}
+	
 	function listen () {
 		while (.descriptors.size() || .timers.size()) {
 			number i;
