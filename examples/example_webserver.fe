@@ -1,6 +1,6 @@
 #! /usr/bin/env ferite
 
-uses 'console', 'regexp', 'posix', 'sys', 'httpserver', 'consoleserver';
+uses 'console', 'regexp', 'posix', 'sys', '../httpserver', '../consoleserver';
 
 function either (void a, void b) {
 	if (a) return a;

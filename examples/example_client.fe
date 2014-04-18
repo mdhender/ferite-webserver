@@ -1,6 +1,6 @@
 #! /usr/bin/env ferite
 
-uses 'console', 'regexp', 'posix', 'sys', 'tcpclient';
+uses 'console', 'regexp', 'posix', 'sys', '../tcpclient';
 
 object google = new TcpClient('www.google.com',80);
 object arstechnica = new TcpClient('www.arstechnica.com',80);
