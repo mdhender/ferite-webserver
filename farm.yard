@@ -6,7 +6,6 @@
 	
 	<collection id="webserver">
 		<list type="module">
-			<file name="webserver.fe" />
 			<file name="consoleserver.fe" />
 			<file name="eventloop.fe" />
 			<file name="httpserver.fe" />
