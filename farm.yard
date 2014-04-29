@@ -1,0 +1,21 @@
+<?xml version="1.0" ?>
+<yard name="ferite-webserver">
+
+	<property id="name" value="ferite-webserver" />
+	<property id="version" value="1.0" />
+	
+	<collection id="webserver">
+		<list type="module">
+			<file name="webserver.fe" />
+			<file name="consoleserver.fe" />
+			<file name="eventloop.fe" />
+			<file name="httpserver.fe" />
+			<file name="tcpclient.fe" />
+			<file name="tcpserver.fe" />
+		</list>
+	</collection>
+	
+	<phase id="install">
+		<copy source="webserver.module" target="$(FeriteModuleSourceDir)" maintainpath="true" />
+	</phase>
+</yard>
