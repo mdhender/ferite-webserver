@@ -112,7 +112,7 @@ class HttpServerRequest extends TcpServerRequest {
 				.buffer = '';
 			}
 			if (
-				.headers['content_type'] != null &&
+				.headers['content_type'] &&
 				.headers.content_type.index('x-www-form-urlencoded') > -1
 			) {
 				.parseQueryString(.post_data);
@@ -137,13 +137,13 @@ class HttpServerRequest extends TcpServerRequest {
 			array h = .headers;
 			
 			if (
-				h['content_length'] != null &&
+				h['content_length'] &&
 				h.content_length > 0
 			) {
 				.processContentLength();
 			}
 			else if (
-				h['transfer_encoding'] != null &&
+				h['transfer_encoding'] &&
 				h.transfer_encoding == 'chunked'
 			) {
 					.processChunked();
@@ -532,6 +532,26 @@ class HttpServerRequest extends TcpServerRequest {
 	}
 }
 
+/**
+ * @class HttpServer
+ * @brief Asynchronous, non-blocking web server
+ * @param number port number to open the listening socket on
+ * @description This module uses EventLoop to implement event oriented
+ *              asynchronous web servers. It abstracts away all the
+ *              messy socket and select control structures so that
+ *              you can concentrate on writing your web app instead
+ *              of managing sockets.
+ * @example <nl/>
+ *  <code>object myServer = new HttpServer(9090);<nl/>
+ * <nl/>
+ * // Simple hello world:<nl/>
+ * myServer.onRequest() using(req) {<nl/>
+ * <tab/>req.respond("&lt;html&gt;&lt;body&gt;Hello World&lt;/body&gt;&lt;/html&gt;");<nl/>
+ * <tab/>req.close();<nl/>
+ * };<nl/>
+ * <nl/>
+ * EventLoop.listen();</code><nl/>
+ */
 class HttpServer extends TcpServer {
 	number sync_post = 0;
 	
