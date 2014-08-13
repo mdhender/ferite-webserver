@@ -98,9 +98,21 @@ class HttpServerRequest extends TcpServerRequest {
 		.post_data = '';
 	}
 	
+	private function invokeHandler () {
+		if (.sync_post) {
+			.handler.invoke(self);
+		}
+		else {
+			.content_handler.invoke(self,.post_data);
+		}
+		.cleanup();
+	}
+	
 	private function processContentLength () {
 		number buffer_length = .buffer.length();
 		number content_length = .headers.content_length;
+		
+		Console.println('processContentLength');
 		
 		if (buffer_length >= content_length) {
 			if (buffer_length > content_length) {
@@ -118,13 +130,7 @@ class HttpServerRequest extends TcpServerRequest {
 				.parseQueryString(.post_data);
 			}
 			
-			if (.sync_post) {
-				.handler.invoke(self);
-			}
-			else {
-				.content_handler.invoke(self,.post_data);
-			}
-			.cleanup();
+			.invokeHandler();
 		}
 	}
 	
@@ -148,15 +154,21 @@ class HttpServerRequest extends TcpServerRequest {
 			) {
 					.processChunked();
 			}
+			else {
+				.invokeHandler();
+			}
 		}
 	}
 	
 	private function parseHttp () {
 		if (!.request) {
 			object m = Regexp.match("\n\\s*\n",.buffer);
+			
 			if (m) {
 				string header_text = .buffer[.. m.start()-1];
 				array lines = Regexp.split("\r*\n",header_text);
+				
+				
 				if (m.end() < .buffer.length()) {
 					.buffer = .buffer[m.end() ..];
 				}
