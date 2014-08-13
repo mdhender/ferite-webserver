@@ -1,0 +1,28 @@
+#! /usr/bin/env ferite
+
+uses 'console', 'regexp', 'posix', 'sys', '../tcpserver', '../consoleserver';
+
+object myServer = new TcpServer(9090);
+object commandLine = new ConsoleServer();
+
+commandLine.command('exit') using (args) {
+	Sys.exit(0);
+};
+
+commandLine.command('d','descriptors') using (args) {
+	Console.println(EventLoop.descriptors.join("\n"));
+};
+
+commandLine.command('unknown') using (cmd) {
+	Console.println("Unknown command: $cmd");
+};
+
+/*
+ * Simple echo server:
+ */
+myServer.onRequest() using(connection) {
+	connection.socket.print(connection.buffer);
+	connection.buffer = "";
+};
+
+EventLoop.listen();
