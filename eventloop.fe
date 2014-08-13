@@ -1,5 +1,9 @@
 uses 'posix', 'sys';
 
+/**
+ * @namespace Eventloop
+ * @brief Implements an eventloop for asynchronous/non-blocking code
+ */
 namespace EventLoop {
 	array descriptors;
 	array handlers;
@@ -9,6 +13,13 @@ namespace EventLoop {
 	
 	number DEFAULT_SLEEP_TIME = 30;
 	
+	/**
+	 * @function getKey
+	 * @declaration function getKey ( object fd )
+	 * @brief Returns a unique identifying string to a FileStream
+	 * @param object fd A FileStream object
+	 * @return A string identifier value
+	 */
 	function getKey (object fd) {
 		return '' + fd.getDescriptor();
 	}
@@ -18,7 +29,7 @@ namespace EventLoop {
 		.descriptors.push(fd);
 		.handlers[key] = h;
 	}
-	
+
 	function delete (object fd) {
 		string key = .getKey(fd);
 		if (.handlers[key]) {
@@ -27,7 +38,20 @@ namespace EventLoop {
 		}
 		fd.close();
 	}
-	
+
+	/**
+	 * @function after
+	 * @declaration function after (number period)
+	 * @brief Executes a closure after a specified number of seconds
+	 * @param number period Number of seconds to wait (note: you can pass in decimals for example 0.5 is half a second)
+	 * @return A number identifying the scheduled event (can be used to cancel the scheduled event)
+	 * @example <nl/>
+	 *  <code>EventLoop.after(1.5) <keyword>using</keyword> { <nl/>
+	 *  <tab/>Console.println( "hello" ); <nl/>
+	 *  };<nl/>
+	 * <nl/>
+	 * EventLoop.listen();</code><nl/>
+	 */	
 	function after (number period) {
 		object handler = recipient();
 		number id = .next_id++;
@@ -42,6 +66,23 @@ namespace EventLoop {
 		return id;
 	}
 	
+	/**
+	 * @function every
+	 * @declaration function every (number period)
+	 * @brief Executes a closure every specified number of seconds
+	 * @param number period Number of seconds to wait between executions (note: you can pass in decimals for example 0.5 is half a second)
+	 * @return A number identifying the scheduled event (can be used to cancel the scheduled event)
+	 * @example <nl/>
+	 *  <code>number n=10;<nl/>
+	 * number id = EventLoop.every(0.2) <keyword>using</keyword> { <nl/>
+	 *  <tab/>Console.println( "count down " + (n--) ); <nl/>
+	 *  <tab/>if (n <= 0) {<nl/>
+	 *  <tab/><tab/>EventLoop.cancel(id);<nl/>
+	 *  <tab/>}
+	 *  };<nl/>
+	 * <nl/>
+	 * EventLoop.listen();</code><nl/>
+	 */
 	function every (number period) {
 		object handler = recipient();
 		number id = .next_id++;
@@ -56,6 +97,12 @@ namespace EventLoop {
 		return id;
 	}
 	
+	/**
+	 * @function cancel
+	 * @declaration function cancel (number id)
+	 * @brief Cancels a scheduled event (either from an EventLoop.after or EventLoop.every)
+	 * @param number id A number identifying the scheduled event
+	 */
 	function cancel (number id) {
 		.timers.each() using (t) {
 			if (t.id == id) {
@@ -92,6 +139,11 @@ namespace EventLoop {
 		}
 	}
 	
+	/**
+	 * @function stop
+	 * @declaration function stop ()
+	 * @brief Gracefully stops the event loop
+	 */
 	function stop () {
 		.descriptors.each() using (d) {
 			.delete(d);
@@ -101,6 +153,11 @@ namespace EventLoop {
 		};
 	}
 	
+	/**
+	 * @function listen
+	 * @declaration function listen ()
+	 * @brief Starts the event loop
+	 */
 	function listen () {
 		while (.descriptors.size() || .timers.size()) {
 			number i;

@@ -12,9 +12,18 @@
 			<file name="tcpclient.fe" />
 			<file name="tcpserver.fe" />
 		</list>
+		<list type="xml">
+			<file name="xml/consoleserver.xml" />
+			<file name="xml/eventloop.xml" />
+			<file name="xml/httpserver.xml" />
+			<file name="xml/tcpclient.xml" />
+			<file name="xml/tcpserver.xml" />
+		</list>
 	</collection>
 	
 	<phase id="install">
 		<copy source="webserver.module" target="$(FeriteModuleSourceDir)" maintainpath="true" />
+		<copy source="webserver.xml" target="$(FeriteModuleDescriptionDir)" />
+		<execute program="feritedoc" arguments="--regenerate" />
 	</phase>
 </yard>

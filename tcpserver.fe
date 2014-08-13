@@ -20,6 +20,26 @@ class TcpServerRequest {
 	}
 }
 
+/**
+ * @class TcpServer
+ * @brief Asynchronous, non-blocking TCP server
+ * @param number port number to open the listening socket on
+ * @description This module uses EventLoop to implement event oriented
+ *              asynchronous TCP servers. It abstracts away all the
+ *              messy socket and select control structures so that
+ *              you can concentrate on writing your server instead
+ *              of managing sockets.
+ * @example <nl/>
+ *  <code>object myServer = new TcpServer(9090);<nl/>
+ * <nl/>
+ * // Simple echo server:<nl/>
+ * myServer.onRequest() using(connection) {<nl/>
+ * <tab/>connection.socket.print(connection.buffer);<nl/>
+ * <tab/>connection.buffer = "";<nl/>
+ * };<nl/>
+ * <nl/>
+ * EventLoop.listen();</code><nl/>
+ */
 class TcpServer {
 	object socket;
 	object handler;
@@ -64,6 +84,8 @@ class TcpServer {
 	function handleRequest () {
 		object client_connection = .socket.accept();
 		object request = .createRequestObject();
+		
+		Console.println("\n\ngot connection from client..");
 		
 		client_connection.nonblock();
 		request.socket = client_connection;
