@@ -85,7 +85,7 @@ class TcpServer {
 		object client_connection = .socket.accept();
 		object request = .createRequestObject();
 		
-		Console.println("\n\ngot connection from client..");
+		// Console.println("\n\ngot connection from client..");
 		
 		client_connection.nonblock();
 		request.socket = client_connection;
