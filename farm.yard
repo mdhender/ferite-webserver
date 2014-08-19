@@ -1,8 +1,8 @@
-<?xml version="1.0" ?>
+<?xml version="1.1" ?>
 <yard name="ferite-webserver">
 
 	<property id="name" value="ferite-webserver" />
-	<property id="version" value="1.0" />
+	<property id="version" value="1.1" />
 	
 	<collection id="webserver">
 		<list type="module">
