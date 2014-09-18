@@ -1,0 +1,9 @@
+<?xml version="1.0" ?>
+<module>
+    <name>eventloop</name>
+    <documentation-list>
+        <include>eventloop.fe</include>
+    </documentation-list>
+    <dependance-list>
+    </dependance-list>
+</module>

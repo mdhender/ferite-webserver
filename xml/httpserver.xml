@@ -1,0 +1,9 @@
+<?xml version="1.0" ?>
+<module>
+    <name>httpserver</name>
+    <documentation-list>
+        <include>httpserver.fe</include>
+    </documentation-list>
+    <dependance-list>
+    </dependance-list>
+</module>

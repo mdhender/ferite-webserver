@@ -1,0 +1,9 @@
+<?xml version="1.0" ?>
+<module>
+    <name>tcpserver</name>
+    <documentation-list>
+        <include>tcpserver.fe</include>
+    </documentation-list>
+    <dependance-list>
+    </dependance-list>
+</module>
