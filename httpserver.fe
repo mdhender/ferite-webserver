@@ -112,8 +112,6 @@ class HttpServerRequest extends TcpServerRequest {
 		number buffer_length = .buffer.length();
 		number content_length = .headers.content_length;
 		
-		Console.println('processContentLength');
-		
 		if (buffer_length >= content_length) {
 			if (buffer_length > content_length) {
 				.post_data = .buffer[.. content_length];
