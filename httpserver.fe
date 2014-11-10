@@ -45,7 +45,7 @@ class HttpServerRequest extends TcpServerRequest {
 	}
 	
 	function timestamp () {
-		return Date.date(Date.GMTnow()).format(.httpDateFormat);
+		return Date.date(Date.now()).format(.httpDateFormat);
 	}
 
 	function parseRequestCommand (string request_text) {
